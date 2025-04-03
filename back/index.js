@@ -12,8 +12,9 @@ app.use(bodyParser.json());
 app.use(cors({ origin: ['http://localhost:5173'],
     methds:["GET","POST"]
  }));
+ const MONGO_URL = process.env.MONGO_URL;
 
-mongoose.connect("mongodb://localhost:27017/project3")//mongodb://localhost:27017/yourproject' process.env.MONGO_URL
+mongoose.connect(MONGO_URL)//mongodb://localhost:27017/yourproject' process.env.MONGO_URL
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.log('MongoDB connection error:', err));
 

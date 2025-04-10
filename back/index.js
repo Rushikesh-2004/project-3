@@ -10,7 +10,7 @@ const port = 3005;
 
 app.use(bodyParser.json());
 app.use(cors({ origin: ['http://localhost:5173', 'https://project-3-9922.onrender.com'],
-    methds:["GET","POST"]
+    methods:["GET","POST"]
  }));
  const MONGO_URL = process.env.MONGO_URL;
 

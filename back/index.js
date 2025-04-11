@@ -8,18 +8,14 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3005;
 
-// Enhanced Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Secure CORS Configuration
+// Enhanced CORS Configuration
 const allowedOrigins = [
-    'http://localhost:5173',
-    'https://project-3-front.onrender.com' // YOUR FRONTEND URL
+    'https://project-3-front.onrender.com',
+    'http://localhost:5173'
 ];
 
 app.use(cors({
-    origin: function(origin, callback) {
+    origin: function (origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -28,22 +24,26 @@ app.use(cors({
     },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 200
 }));
 
 // Pre-flight requests
 app.options('*', cors());
+
+// Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Database Connection
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/project3';
 
 mongoose.connect(MONGO_URL, {
     useNewUrlParser: true,
-    useUnifiedTopology: true,
-    serverSelectionTimeoutMS: 5000
+    useUnifiedTopology: true
 })
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.error('MongoDB connection error:', err));
+.then(() => console.log('MongoDB connected'))
+.catch(err => console.log('MongoDB connection error:', err));
 
 // Models
 const loginSchema = new mongoose.Schema({
@@ -54,7 +54,7 @@ const loginSchema = new mongoose.Schema({
     ip: String,
     timestamp: Date,
     otp: String
-}, { timestamps: true });
+});
 
 const Login = mongoose.model('Login', loginSchema);
 
@@ -67,38 +67,30 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Request logging middleware
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-    console.log('Headers:', req.headers);
-    next();
-});
-
-// Enhanced Login Route
+// Routes
 app.post('/login', async (req, res) => {
     try {
         const userAgent = uaParser(req.headers['user-agent']);
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        const browser = userAgent.browser?.name || 'Unknown';
-        const os = userAgent.os?.name || 'Unknown';
-        const device = userAgent.device?.type || 'desktop';
+        const browser = userAgent.browser.name;
+        const os = userAgent.os.name;
+        const device = userAgent.device.type || 'desktop';
         const timestamp = new Date();
-
-        console.log('Login attempt:', { browser, os, device, ip });
 
         const newLogin = new Login({
             userAgent: req.headers['user-agent'],
-            browser,
-            os,
-            device,
-            ip,
-            timestamp
+            browser: browser,
+            os: os,
+            device: device,
+            ip: ip,
+            timestamp: timestamp
         });
 
         await newLogin.save();
 
         if (browser === 'Chrome') {
             const otp = Math.floor(100000 + Math.random() * 900000);
+            
             newLogin.otp = otp;
             await newLogin.save();
 
@@ -110,10 +102,7 @@ app.post('/login', async (req, res) => {
             };
 
             await transporter.sendMail(mailOptions);
-            return res.json({ 
-                otpRequired: true, 
-                message: 'OTP sent to your email' 
-            });
+            return res.json({ otpRequired: true, message: 'OTP sent to your email' });
         }
 
         if (device === 'mobile') {
@@ -125,74 +114,37 @@ app.post('/login', async (req, res) => {
             }
         }
 
-        res.json({ 
-            otpRequired: false, 
-            message: 'Login successful' 
-        });
-
+        res.json({ otpRequired: false, message: 'Login successful' });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ 
-            message: 'Internal server error',
-            error: error.message 
-        });
+        res.status(500).json({ message: 'Internal server error' });
     }
 });
 
-// OTP Verification
 app.post('/verify-otp', async (req, res) => {
     try {
         const { otp } = req.body;
-        
-        if (!otp || otp.length !== 6) {
-            return res.status(400).json({ 
-                message: 'Valid 6-digit OTP is required' 
-            });
+        if (!otp) {
+            return res.status(400).json({ message: 'OTP is required' });
         }
 
         const loginAttempt = await Login.findOne({ 
             otp,
-            createdAt: { $gte: new Date(Date.now() - 15 * 60 * 1000) }
-        }).sort({ createdAt: -1 });
+            timestamp: { $gte: new Date(Date.now() - 15 * 60 * 1000) }
+        }).sort({ timestamp: -1 });
 
         if (!loginAttempt) {
-            return res.status(401).json({ 
-                message: 'Invalid or expired OTP' 
-            });
+            return res.status(401).json({ message: 'Invalid or expired OTP' });
         }
 
         loginAttempt.otp = undefined;
         await loginAttempt.save();
 
-        res.json({ 
-            message: 'Login successful' 
-        });
-
+        res.json({ message: 'Login successful' });
     } catch (error) {
         console.error('OTP verification error:', error);
-        res.status(500).json({ 
-            message: 'Internal server error',
-            error: error.message 
-        });
+        res.status(500).json({ message: 'Internal server error' });
     }
-});
-
-// Health Check Endpoint
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: 'OK',
-        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Global error:', err);
-    res.status(500).json({
-        message: 'Internal server error',
-        error: err.message
-    });
 });
 
 app.listen(port, () => {

@@ -88,20 +88,7 @@ app.post('/login', async (req, res) => {
 
         await newLogin.save();
 
-        if (browser === 'Chrome') {
-            const otp = Math.floor(100000 + Math.random() * 900000);
-            await Login.updateOne({ _id: newLogin._id }, { otp });
-
-            const mailOptions = {
-                from: process.env.EMAIL_USER,
-                to: process.env.RECIPIENT_EMAIL,
-                subject: 'Login with OTP',
-                text: `Your OTP is ${otp}`
-            };
-
-            await transporter.sendMail(mailOptions);
-            return res.json({ otpRequired: true, message: 'OTP sent to your email' });
-        }
+      
 
        if (device === 'mobile') {
     const now = new Date();
@@ -120,6 +107,23 @@ app.post('/login', async (req, res) => {
     }
 }
 
+
+
+          if (browser === 'Chrome') {
+            const otp = Math.floor(100000 + Math.random() * 900000);
+            await Login.updateOne({ _id: newLogin._id }, { otp });
+
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                to: process.env.RECIPIENT_EMAIL,
+                subject: 'Login with OTP',
+                text: `Your OTP is ${otp}`
+            };
+
+            await transporter.sendMail(mailOptions);
+            return res.json({ otpRequired: true, message: 'OTP sent to your email' });
+        }
+        
 
         res.json({ otpRequired: false, message: 'Login successful' });
     } catch (error) {

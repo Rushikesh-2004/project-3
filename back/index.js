@@ -103,14 +103,23 @@ app.post('/login', async (req, res) => {
             return res.json({ otpRequired: true, message: 'OTP sent to your email' });
         }
 
-        if (device === 'mobile') {
-            const hour = new Date().getHours();
-            if (hour < 10 || hour >= 13) {
-                return res.status(403).json({ 
-                message: 'Access restricted to 10 AM - 1 PM on mobile devices' 
-                });
-            }
-        }
+       if (device === 'mobile') {
+    const now = new Date();
+    const currentTime = now.getTime();
+
+    const startTime = new Date(now);
+    startTime.setHours(10, 0, 0, 0); // 10:00:00.000 AM
+
+    const endTime = new Date(now);
+    endTime.setHours(13, 0, 0, 0); // 1:00:00.000 PM
+
+    if (currentTime < startTime.getTime() || currentTime >= endTime.getTime()) {
+        return res.status(403).json({ 
+            message: 'Access restricted to 10 AM - 1 PM on mobile devices' 
+        });
+    }
+}
+
 
         res.json({ otpRequired: false, message: 'Login successful' });
     } catch (error) {

@@ -8,18 +8,15 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3005;
 
-// 1. Configure allowed origins (MUST match exactly)
 const allowedOrigins = [
     'https://project-3-front.onrender.com',
     'http://localhost:5173'
 ];
 
-// 2. Enhanced CORS middleware
+// CORS middleware
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -33,7 +30,7 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 
-// 3. Explicit OPTIONS handler for preflight
+// OPTIONS preflight handler
 app.options('*', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -46,18 +43,16 @@ app.options('*', (req, res) => {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Database Connection
+// DB Connection
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/project3';
 
 mongoose.connect(MONGO_URL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000
 })
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Models
+// Schema
 const loginSchema = new mongoose.Schema({
     userAgent: String,
     browser: String,
@@ -70,7 +65,7 @@ const loginSchema = new mongoose.Schema({
 
 const Login = mongoose.model('Login', loginSchema);
 
-// Email Configuration
+// Email Transporter
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -79,20 +74,20 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Request logging middleware
+// Logging
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     console.log('Origin:', req.headers.origin);
-    console.log('Headers:', req.headers);
     next();
 });
 
 // Login Route
 app.post('/login', async (req, res) => {
     try {
-        // Set CORS headers manually
         res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+        console.log('Login request received');
 
         const userAgent = uaParser(req.headers['user-agent']);
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -100,8 +95,6 @@ app.post('/login', async (req, res) => {
         const os = userAgent.os?.name || 'Unknown';
         const device = userAgent.device?.type || 'desktop';
         const timestamp = new Date();
-
-        console.log('Login attempt:', { browser, os, device, ip });
 
         const newLogin = new Login({
             userAgent: req.headers['user-agent'],
@@ -149,7 +142,6 @@ app.post('/login', async (req, res) => {
 // OTP Verification Route
 app.post('/verify-otp', async (req, res) => {
     try {
-        // Set CORS headers manually
         res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
 
@@ -177,7 +169,7 @@ app.post('/verify-otp', async (req, res) => {
     }
 });
 
-// Health Check Endpoint
+// Health Check
 app.get('/health', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -189,9 +181,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Start Server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
-    console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
     console.log(`Health check: https://project-3-back-f6yv.onrender.com/health`);
 });

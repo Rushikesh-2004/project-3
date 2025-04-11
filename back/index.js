@@ -15,12 +15,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Secure CORS Configuration
 const allowedOrigins = [
     'http://localhost:5173',
-    'https://your-frontend-url.onrender.com' // REPLACE WITH YOUR ACTUAL FRONTEND URL
+    'https://project-3-front.onrender.com' // YOUR FRONTEND URL
 ];
 
 app.use(cors({
     origin: function(origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -39,7 +39,8 @@ const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/project3';
 
 mongoose.connect(MONGO_URL, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000
 })
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
@@ -57,24 +58,19 @@ const loginSchema = new mongoose.Schema({
 
 const Login = mongoose.model('Login', loginSchema);
 
-// Email Configuration with error handling
-let transporter;
-try {
-    transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
-    console.log('Email transporter created successfully');
-} catch (err) {
-    console.error('Failed to create email transporter:', err);
-}
+// Email Configuration
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log('Headers:', req.headers);
     next();
 });
 
@@ -83,12 +79,12 @@ app.post('/login', async (req, res) => {
     try {
         const userAgent = uaParser(req.headers['user-agent']);
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        const browser = userAgent.browser.name || 'Unknown';
-        const os = userAgent.os.name || 'Unknown';
-        const device = userAgent.device.type || 'desktop';
+        const browser = userAgent.browser?.name || 'Unknown';
+        const os = userAgent.os?.name || 'Unknown';
+        const device = userAgent.device?.type || 'desktop';
         const timestamp = new Date();
 
-        console.log('Login attempt from:', { browser, os, device, ip });
+        console.log('Login attempt:', { browser, os, device, ip });
 
         const newLogin = new Login({
             userAgent: req.headers['user-agent'],
@@ -106,24 +102,15 @@ app.post('/login', async (req, res) => {
             newLogin.otp = otp;
             await newLogin.save();
 
-            console.log('Generated OTP:', otp);
-
-            if (!transporter) {
-                throw new Error('Email service not configured');
-            }
-
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: process.env.RECIPIENT_EMAIL,
                 subject: 'Login with OTP',
-                text: `Your OTP is ${otp}`,
-                html: `<p>Your OTP is <strong>${otp}</strong></p>`
+                text: `Your OTP is ${otp}`
             };
 
             await transporter.sendMail(mailOptions);
-            console.log('OTP email sent successfully');
-            
-            return res.status(200).json({ 
+            return res.json({ 
                 otpRequired: true, 
                 message: 'OTP sent to your email' 
             });
@@ -133,13 +120,12 @@ app.post('/login', async (req, res) => {
             const hour = timestamp.getHours();
             if (hour < 10 || hour > 13) {
                 return res.status(403).json({ 
-                    success: false,
                     message: 'Access restricted to 10 AM - 1 PM on mobile devices' 
                 });
             }
         }
 
-        res.status(200).json({ 
+        res.json({ 
             otpRequired: false, 
             message: 'Login successful' 
         });
@@ -147,21 +133,19 @@ app.post('/login', async (req, res) => {
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ 
-            success: false,
             message: 'Internal server error',
             error: error.message 
         });
     }
 });
 
-// Enhanced OTP Verification
+// OTP Verification
 app.post('/verify-otp', async (req, res) => {
     try {
         const { otp } = req.body;
         
         if (!otp || otp.length !== 6) {
             return res.status(400).json({ 
-                success: false,
                 message: 'Valid 6-digit OTP is required' 
             });
         }
@@ -173,7 +157,6 @@ app.post('/verify-otp', async (req, res) => {
 
         if (!loginAttempt) {
             return res.status(401).json({ 
-                success: false,
                 message: 'Invalid or expired OTP' 
             });
         }
@@ -181,36 +164,33 @@ app.post('/verify-otp', async (req, res) => {
         loginAttempt.otp = undefined;
         await loginAttempt.save();
 
-        res.status(200).json({ 
-            success: true,
+        res.json({ 
             message: 'Login successful' 
         });
 
     } catch (error) {
         console.error('OTP verification error:', error);
         res.status(500).json({ 
-            success: false,
             message: 'Internal server error',
             error: error.message 
         });
     }
 });
 
-// Health check endpoint
+// Health Check Endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({ 
+    res.json({ 
         status: 'OK',
-        timestamp: new Date().toISOString(),
-        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString()
     });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Global error handler:', err);
+    console.error('Global error:', err);
     res.status(500).json({
-        success: false,
-        message: 'An unexpected error occurred',
+        message: 'Internal server error',
         error: err.message
     });
 });

@@ -8,7 +8,6 @@ function App() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Use environment variable for backend URL (no trailing slash)
     const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://project-3-back-f6yv.onrender.com';
 
     const handleLogin = async () => {
@@ -17,9 +16,10 @@ function App() {
         try {
             const response = await axios.post(`${API_BASE_URL}/login`, {}, {
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                timeout: 10000 // 10 second timeout
+                withCredentials: true
             });
             
             if (response.data.otpRequired) {
@@ -29,16 +29,11 @@ function App() {
                 setMessage(response.data.message);
             }
         } catch (error) {
-            let errorMsg = 'Network Error - Could not connect to server';
-            if (error.response) {
-                // Server responded with error status
-                errorMsg = error.response.data.message || 'Request failed';
-            } else if (error.request) {
-                // Request was made but no response
-                errorMsg = 'No response from server';
-            }
+            console.error('Login error:', error);
+            const errorMsg = error.response?.data?.message || 
+                           error.message || 
+                           'Login failed. Please try again.';
             setError(errorMsg);
-            console.error('Login error details:', error);
         } finally {
             setIsLoading(false);
         }
@@ -57,19 +52,19 @@ function App() {
                 { otp },
                 {
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
-                    timeout: 10000
+                    withCredentials: true
                 }
             );
             setMessage(response.data.message);
         } catch (error) {
-            let errorMsg = 'Network Error - Could not verify OTP';
-            if (error.response) {
-                errorMsg = error.response.data.message || 'OTP verification failed';
-            }
+            console.error('OTP error:', error);
+            const errorMsg = error.response?.data?.message || 
+                           error.message || 
+                           'OTP verification failed';
             setError(errorMsg);
-            console.error('OTP error details:', error);
         } finally {
             setIsLoading(false);
         }
@@ -87,10 +82,7 @@ function App() {
                     border: '1px solid red',
                     borderRadius: '4px'
                 }}>
-                    <strong>Error:</strong> {error}
-                    <div style={{ fontSize: '0.8em', marginTop: '5px' }}>
-                        Check console for details (F12 → Console)
-                    </div>
+                    {error}
                 </div>
             )}
             

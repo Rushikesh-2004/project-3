@@ -9,7 +9,7 @@ function App() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Use your exact Render backend URL
-    const API_BASE_URL = 'https://project-3-2m1e.onrender.com';
+    const API_BASE_URL = 'https://project-3-ortq.onrender.com';
 
     const handleLogin = async () => {
         setIsLoading(true);

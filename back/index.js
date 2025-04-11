@@ -7,7 +7,7 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 0.0.0.0;
+const port = process.env.PORT || 3005;
 
 // Configure allowed origins
 const allowedOrigins = [
@@ -160,7 +160,7 @@ app.get('/', (req, res) => {
 });
 
 // Start Server
-app.listen(port, () => {
+app.listen(port,'0.0.0.0', () => {
     console.log(`Server running on port ${port}`);
     console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 });

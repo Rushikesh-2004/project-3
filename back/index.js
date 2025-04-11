@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const uaParser = require('ua-parser-js');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
+
 const app = express();
 const port = process.env.PORT || 3005;
 
@@ -13,7 +14,7 @@ const allowedOrigins = [
     'http://localhost:5173'
 ];
 
-// CORS middleware
+// CORS
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
@@ -30,7 +31,7 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 
-// OPTIONS preflight handler
+// Preflight handler
 app.options('*', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -43,14 +44,11 @@ app.options('*', (req, res) => {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// DB Connection
+// MongoDB
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/project3';
-
-mongoose.connect(MONGO_URL, {
-    serverSelectionTimeoutMS: 5000
-})
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 5000 })
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Schema
 const loginSchema = new mongoose.Schema({
@@ -65,7 +63,7 @@ const loginSchema = new mongoose.Schema({
 
 const Login = mongoose.model('Login', loginSchema);
 
-// Email Transporter
+// Email
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -74,20 +72,18 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Logging
+// Logger
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     console.log('Origin:', req.headers.origin);
     next();
 });
 
-// Login Route
+// Routes
 app.post('/login', async (req, res) => {
     try {
         res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-        console.log('Login request received');
 
         const userAgent = uaParser(req.headers['user-agent']);
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -126,8 +122,8 @@ app.post('/login', async (req, res) => {
         if (device === 'mobile') {
             const hour = timestamp.getHours();
             if (hour < 10 || hour > 13) {
-                return res.status(403).json({ 
-                    message: 'Access restricted to 10 AM - 1 PM on mobile devices' 
+                return res.status(403).json({
+                    message: 'Access restricted to 10 AM - 1 PM on mobile devices'
                 });
             }
         }
@@ -139,7 +135,6 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// OTP Verification Route
 app.post('/verify-otp', async (req, res) => {
     try {
         res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
@@ -150,7 +145,7 @@ app.post('/verify-otp', async (req, res) => {
             return res.status(400).json({ message: 'Valid 6-digit OTP is required' });
         }
 
-        const loginAttempt = await Login.findOne({ 
+        const loginAttempt = await Login.findOne({
             otp,
             createdAt: { $gte: new Date(Date.now() - 15 * 60 * 1000) }
         }).sort({ createdAt: -1 });
@@ -169,11 +164,11 @@ app.post('/verify-otp', async (req, res) => {
     }
 });
 
-// Health Check
+// Health
 app.get('/health', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.json({ 
+    res.json({
         status: 'OK',
         database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString(),
@@ -181,14 +176,13 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Root Route to prevent "Cannot GET /"
+// 👇 This route prevents "Cannot GET /"
 app.get('/', (req, res) => {
     res.send('Backend is live 🚀');
 });
 
+// Start
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log(`Health check: https://project-3-back-f6yv.onrender.com/health`);
-});
-
 });

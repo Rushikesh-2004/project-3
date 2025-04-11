@@ -8,7 +8,8 @@ function App() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://project-3-back-f6yv.onrender.com';
+    // MUST use HTTPS and exact Render URL (no trailing slash)
+    const API_BASE_URL = 'https://project-3-back-f6yv.onrender.com';
 
     const handleLogin = async () => {
         setIsLoading(true);
@@ -19,7 +20,8 @@ function App() {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                withCredentials: true
+                withCredentials: true,
+                timeout: 10000 // 10 second timeout
             });
             
             if (response.data.otpRequired) {
@@ -29,10 +31,13 @@ function App() {
                 setMessage(response.data.message);
             }
         } catch (error) {
-            console.error('Login error:', error);
-            const errorMsg = error.response?.data?.message || 
-                           error.message || 
-                           'Login failed. Please try again.';
+            console.error('Full error details:', error);
+            let errorMsg = 'Network Error - Could not connect to server';
+            if (error.code === 'ECONNABORTED') {
+                errorMsg = 'Request timeout - server is not responding';
+            } else if (error.response) {
+                errorMsg = error.response.data.message || 'Request failed';
+            }
             setError(errorMsg);
         } finally {
             setIsLoading(false);
@@ -55,15 +60,17 @@ function App() {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    withCredentials: true
+                    withCredentials: true,
+                    timeout: 10000
                 }
             );
             setMessage(response.data.message);
         } catch (error) {
-            console.error('OTP error:', error);
-            const errorMsg = error.response?.data?.message || 
-                           error.message || 
-                           'OTP verification failed';
+            console.error('OTP error details:', error);
+            let errorMsg = 'Network Error - Could not verify OTP';
+            if (error.response) {
+                errorMsg = error.response.data.message || 'OTP verification failed';
+            }
             setError(errorMsg);
         } finally {
             setIsLoading(false);
@@ -82,7 +89,10 @@ function App() {
                     border: '1px solid red',
                     borderRadius: '4px'
                 }}>
-                    {error}
+                    <strong>Error:</strong> {error}
+                    <div style={{ fontSize: '0.8em', marginTop: '5px' }}>
+                        Check backend logs for details
+                    </div>
                 </div>
             )}
             

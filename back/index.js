@@ -181,7 +181,14 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Root Route to prevent "Cannot GET /"
+app.get('/', (req, res) => {
+    res.send('Backend is live 🚀');
+});
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log(`Health check: https://project-3-back-f6yv.onrender.com/health`);
+});
+
 });

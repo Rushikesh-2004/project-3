@@ -8,17 +8,22 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3005;
 
-// Enhanced CORS Configuration
+// 1. Configure allowed origins (MUST match exactly)
 const allowedOrigins = [
     'https://project-3-front.onrender.com',
     'http://localhost:5173'
 ];
 
+// 2. Enhanced CORS middleware
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
+            console.error(`CORS blocked for origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -28,8 +33,14 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 
-// Pre-flight requests
-app.options('*', cors());
+// 3. Explicit OPTIONS handler for preflight
+app.options('*', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.status(200).end();
+});
 
 // Middleware
 app.use(bodyParser.json());
@@ -40,10 +51,11 @@ const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/project3';
 
 mongoose.connect(MONGO_URL, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000
 })
 .then(() => console.log('MongoDB connected'))
-.catch(err => console.log('MongoDB connection error:', err));
+.catch(err => console.error('MongoDB connection error:', err));
 
 // Models
 const loginSchema = new mongoose.Schema({
@@ -54,7 +66,7 @@ const loginSchema = new mongoose.Schema({
     ip: String,
     timestamp: Date,
     otp: String
-});
+}, { timestamps: true });
 
 const Login = mongoose.model('Login', loginSchema);
 
@@ -67,30 +79,43 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Routes
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log('Origin:', req.headers.origin);
+    console.log('Headers:', req.headers);
+    next();
+});
+
+// Login Route
 app.post('/login', async (req, res) => {
     try {
+        // Set CORS headers manually
+        res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+
         const userAgent = uaParser(req.headers['user-agent']);
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-        const browser = userAgent.browser.name;
-        const os = userAgent.os.name;
-        const device = userAgent.device.type || 'desktop';
+        const browser = userAgent.browser?.name || 'Unknown';
+        const os = userAgent.os?.name || 'Unknown';
+        const device = userAgent.device?.type || 'desktop';
         const timestamp = new Date();
+
+        console.log('Login attempt:', { browser, os, device, ip });
 
         const newLogin = new Login({
             userAgent: req.headers['user-agent'],
-            browser: browser,
-            os: os,
-            device: device,
-            ip: ip,
-            timestamp: timestamp
+            browser,
+            os,
+            device,
+            ip,
+            timestamp
         });
 
         await newLogin.save();
 
         if (browser === 'Chrome') {
             const otp = Math.floor(100000 + Math.random() * 900000);
-            
             newLogin.otp = otp;
             await newLogin.save();
 
@@ -121,17 +146,22 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// OTP Verification Route
 app.post('/verify-otp', async (req, res) => {
     try {
+        // Set CORS headers manually
+        res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+
         const { otp } = req.body;
-        if (!otp) {
-            return res.status(400).json({ message: 'OTP is required' });
+        if (!otp || otp.length !== 6) {
+            return res.status(400).json({ message: 'Valid 6-digit OTP is required' });
         }
 
         const loginAttempt = await Login.findOne({ 
             otp,
-            timestamp: { $gte: new Date(Date.now() - 15 * 60 * 1000) }
-        }).sort({ timestamp: -1 });
+            createdAt: { $gte: new Date(Date.now() - 15 * 60 * 1000) }
+        }).sort({ createdAt: -1 });
 
         if (!loginAttempt) {
             return res.status(401).json({ message: 'Invalid or expired OTP' });
@@ -147,7 +177,21 @@ app.post('/verify-otp', async (req, res) => {
     }
 });
 
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.json({ 
+        status: 'OK',
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        timestamp: new Date().toISOString(),
+        allowedOrigins
+    });
+});
+
+// Start Server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
     console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
+    console.log(`Health check: https://project-3-back-f6yv.onrender.com/health`);
 });

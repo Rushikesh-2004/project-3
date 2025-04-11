@@ -9,45 +9,31 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3005;
 
+// Configure allowed origins
 const allowedOrigins = [
     'https://project-3-front.onrender.com',
     'http://localhost:5173'
 ];
 
-// CORS
+// Enhanced CORS configuration
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.error(`CORS blocked for origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 200
+    credentials: true
 }));
 
-// Preflight handler
-app.options('*', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.status(200).end();
-});
+// Handle preflight requests
+app.options('*', cors());
 
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// MongoDB
+// MongoDB Connection
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/project3';
 mongoose.connect(MONGO_URL, { serverSelectionTimeoutMS: 5000 })
-    .then(() => console.log('MongoDB connected'))
+    .then(() => console.log('MongoDB connected successfully'))
     .catch(err => console.error('MongoDB connection error:', err));
 
 // Schema
@@ -63,7 +49,7 @@ const loginSchema = new mongoose.Schema({
 
 const Login = mongoose.model('Login', loginSchema);
 
-// Email
+// Email Configuration
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -72,25 +58,23 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Logger
+// Request logging middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     console.log('Origin:', req.headers.origin);
     next();
 });
 
-// Routes
+// Login Route
 app.post('/login', async (req, res) => {
     try {
-        res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-
         const userAgent = uaParser(req.headers['user-agent']);
         const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
         const browser = userAgent.browser?.name || 'Unknown';
         const os = userAgent.os?.name || 'Unknown';
         const device = userAgent.device?.type || 'desktop';
-        const timestamp = new Date();
+
+        console.log('Login attempt from:', { browser, os, device, ip });
 
         const newLogin = new Login({
             userAgent: req.headers['user-agent'],
@@ -98,15 +82,14 @@ app.post('/login', async (req, res) => {
             os,
             device,
             ip,
-            timestamp
+            timestamp: new Date()
         });
 
         await newLogin.save();
 
         if (browser === 'Chrome') {
             const otp = Math.floor(100000 + Math.random() * 900000);
-            newLogin.otp = otp;
-            await newLogin.save();
+            await Login.updateOne({ _id: newLogin._id }, { otp });
 
             const mailOptions = {
                 from: process.env.EMAIL_USER,
@@ -120,10 +103,10 @@ app.post('/login', async (req, res) => {
         }
 
         if (device === 'mobile') {
-            const hour = timestamp.getHours();
+            const hour = new Date().getHours();
             if (hour < 10 || hour > 13) {
-                return res.status(403).json({
-                    message: 'Access restricted to 10 AM - 1 PM on mobile devices'
+                return res.status(403).json({ 
+                    message: 'Access restricted to 10 AM - 1 PM on mobile devices' 
                 });
             }
         }
@@ -135,17 +118,15 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// OTP Verification Route
 app.post('/verify-otp', async (req, res) => {
     try {
-        res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-
         const { otp } = req.body;
         if (!otp || otp.length !== 6) {
             return res.status(400).json({ message: 'Valid 6-digit OTP is required' });
         }
 
-        const loginAttempt = await Login.findOne({
+        const loginAttempt = await Login.findOne({ 
             otp,
             createdAt: { $gte: new Date(Date.now() - 15 * 60 * 1000) }
         }).sort({ createdAt: -1 });
@@ -154,8 +135,7 @@ app.post('/verify-otp', async (req, res) => {
             return res.status(401).json({ message: 'Invalid or expired OTP' });
         }
 
-        loginAttempt.otp = undefined;
-        await loginAttempt.save();
+        await Login.updateOne({ _id: loginAttempt._id }, { $unset: { otp: 1 } });
 
         res.json({ message: 'Login successful' });
     } catch (error) {
@@ -164,25 +144,22 @@ app.post('/verify-otp', async (req, res) => {
     }
 });
 
-// Health
+// Health Check Endpoint
 app.get('/health', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.json({
+    res.json({ 
         status: 'OK',
         database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-        timestamp: new Date().toISOString(),
-        allowedOrigins
+        timestamp: new Date().toISOString()
     });
 });
 
-// 👇 This route prevents "Cannot GET /"
+// Root endpoint
 app.get('/', (req, res) => {
-    res.send('Backend is live 🚀');
+    res.send('Backend is running');
 });
 
-// Start
+// Start Server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
-    console.log(`Health check: https://project-3-back-f6yv.onrender.com/health`);
+    console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 });

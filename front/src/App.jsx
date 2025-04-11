@@ -8,6 +8,7 @@ function App() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    // Use your exact Render backend URL
     const API_BASE_URL = 'https://project-3-back-f6yv.onrender.com';
 
     const handleLogin = async () => {
@@ -16,13 +17,11 @@ function App() {
         try {
             const response = await axios.post(`${API_BASE_URL}/login`, {}, {
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    'Content-Type': 'application/json'
                 },
-                withCredentials: true,
-                timeout: 30000 // increased timeout to 30s
+                timeout: 10000
             });
-
+            
             if (response.data.otpRequired) {
                 setOtpSent(true);
                 setMessage(response.data.message);
@@ -30,12 +29,12 @@ function App() {
                 setMessage(response.data.message);
             }
         } catch (error) {
-            console.error('Full error details:', error.toJSON?.() || error);
-            let errorMsg = 'Network Error - Could not connect to server';
-            if (error.code === 'ECONNABORTED') {
-                errorMsg = 'Request timeout - server is not responding';
-            } else if (error.response) {
+            console.error('Login error:', error);
+            let errorMsg = 'Could not connect to server';
+            if (error.response) {
                 errorMsg = error.response.data.message || 'Request failed';
+            } else if (error.code === 'ECONNABORTED') {
+                errorMsg = 'Server timeout - try again';
             }
             setError(errorMsg);
         } finally {
@@ -56,19 +55,17 @@ function App() {
                 { otp },
                 {
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+                        'Content-Type': 'application/json'
                     },
-                    withCredentials: true,
-                    timeout: 30000
+                    timeout: 10000
                 }
             );
             setMessage(response.data.message);
         } catch (error) {
-            console.error('OTP error details:', error.toJSON?.() || error);
-            let errorMsg = 'Network Error - Could not verify OTP';
+            console.error('OTP error:', error);
+            let errorMsg = 'Could not verify OTP';
             if (error.response) {
-                errorMsg = error.response.data.message || 'OTP verification failed';
+                errorMsg = error.response.data.message || 'Verification failed';
             }
             setError(errorMsg);
         } finally {
@@ -79,18 +76,30 @@ function App() {
     return (
         <div className="App" style={{ padding: '20px', maxWidth: '400px', margin: '0 auto' }}>
             <h1 style={{ textAlign: 'center' }}>Login</h1>
-
+            
             {error && (
-                <div style={{ color: 'red', padding: '10px', margin: '10px 0', border: '1px solid red', borderRadius: '4px' }}>
+                <div style={{ 
+                    color: 'red', 
+                    padding: '10px', 
+                    margin: '10px 0',
+                    border: '1px solid red',
+                    borderRadius: '4px'
+                }}>
                     <strong>Error:</strong> {error}
                     <div style={{ fontSize: '0.8em', marginTop: '5px' }}>
-                        Check backend logs for details
+                        Status: {isLoading ? 'Loading...' : 'Ready'}
                     </div>
                 </div>
             )}
-
+            
             {message && (
-                <div style={{ color: 'green', padding: '10px', margin: '10px 0', border: '1px solid green', borderRadius: '4px' }}>
+                <div style={{ 
+                    color: 'green', 
+                    padding: '10px', 
+                    margin: '10px 0',
+                    border: '1px solid green',
+                    borderRadius: '4px'
+                }}>
                     {message}
                 </div>
             )}
@@ -102,7 +111,12 @@ function App() {
                         value={otp}
                         onChange={(e) => setOtp(e.target.value)}
                         placeholder="Enter OTP"
-                        style={{ padding: '10px', fontSize: '16px', borderRadius: '4px', border: '1px solid #ccc' }}
+                        style={{ 
+                            padding: '10px',
+                            fontSize: '16px',
+                            borderRadius: '4px',
+                            border: '1px solid #ccc'
+                        }}
                         disabled={isLoading}
                     />
                     <button 

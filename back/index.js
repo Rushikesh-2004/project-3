@@ -105,7 +105,7 @@ app.post('/login', async (req, res) => {
 
         if (device === 'mobile') {
             const hour = new Date().getHours();
-            if (hour < 10 || hour > 13) {
+            if (hour < 10 && hour > 13) {
                 return res.status(403).json({ 
                     message: 'Access restricted to 10 AM - 1 PM on mobile devices' 
                 });

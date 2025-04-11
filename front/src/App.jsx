@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState } from 'react';
 import axios from 'axios';
 
@@ -10,22 +9,32 @@ function App() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Use environment variable for backend URL
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3005';
+    const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://your-backend-url.onrender.com';
 
     const handleLogin = async () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await axios.post(`${API_BASE_URL}/login`);
+            const response = await axios.post(`${API_BASE_URL}/login`, {}, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            
             if (response.data.otpRequired) {
                 setOtpSent(true);
                 setMessage(response.data.message);
             } else {
                 setMessage(response.data.message);
-                // Here you would typically redirect on successful login
             }
         } catch (error) {
-            setError(error.response?.data?.message || 'Login failed. Please try again.');
+            console.error('Login error:', error);
+            const errorMessage = error.response?.data?.message || 
+                               error.response?.data ||
+                               error.message || 
+                               'Login failed. Please try again.';
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -40,13 +49,23 @@ function App() {
         setIsLoading(true);
         setError('');
         try {
-            const response = await axios.post(`${API_BASE_URL}/verify-otp`, { otp });
+            const response = await axios.post(`${API_BASE_URL}/verify-otp`, 
+                { otp },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                }
+            );
             setMessage(response.data.message);
-            // Here you would typically:
-            // 1. Store authentication token
-            // 2. Redirect to dashboard
         } catch (error) {
-            setError(error.response?.data?.message || 'OTP verification failed');
+            console.error('OTP error:', error);
+            const errorMessage = error.response?.data?.message || 
+                               error.response?.data ||
+                               error.message || 
+                               'OTP verification failed';
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -104,7 +123,7 @@ function App() {
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
-                            cursor: 'pointer',
+                            cursor: isLoading ? 'not-allowed' : 'pointer',
                             fontSize: '16px'
                         }}
                     >
@@ -121,7 +140,7 @@ function App() {
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
-                        cursor: 'pointer',
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
                         fontSize: '16px',
                         width: '100%'
                     }}
